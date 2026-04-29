@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="A browser-based tool for combining, reordering, and rendering multiple markdown files into a single printable document or PDF. No upload, no server — runs entirely in your browser.">
+<title>Markdown Booklet</title>
+
+<script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<style>
+:root {
+  --page-bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-alt: #f8fafc;
+  --ink: #1f2937;
+  --muted: #667085;
+  --border: #d0d7de;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --danger: #b42318;
+  --shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+  --preview-font: Georgia, "Times New Roman", serif;
+  --preview-size: 16px;
+  --preview-line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 32px clamp(24px, 3vw, 56px);
+}
+
+.app-header {
+  margin-bottom: 22px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(720px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 24px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+  padding: 16px;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+label {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.value-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input[type="text"],
+select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px 11px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.dropzone {
+  display: grid;
+  place-items: center;
+  min-height: 154px;
+  border: 2px dashed #98a2b3;
+  border-radius: 8px;
+  background: var(--surface-alt);
+  color: #344054;
+  cursor: pointer;
+  margin: 12px 0 14px;
+  padding: 20px;
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.dropzone:hover,
+.dropzone:focus,
+.dropzone.dragover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #1d4ed8;
+  outline: none;
+}
+
+.drop-title {
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.drop-meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.file-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#fileStatus {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.file-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  min-height: 48px;
+  padding: 0;
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 13px;
+  text-align: center;
+}
+
+.file-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.file-item-ghost {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.order-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #eef2f7;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.drag-handle {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: grab;
+  font-weight: 800;
+  line-height: 1;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.file-meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.remove-file {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.remove-file:hover,
+.remove-file:focus {
+  background: #fef3f2;
+  color: var(--danger);
+  outline: none;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.primary,
+.secondary,
+.ghost {
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.primary:hover,
+.primary:focus {
+  background: #1d4ed8;
+  outline: none;
+}
+
+.secondary {
+  background: #26323f;
+  color: #ffffff;
+}
+
+.secondary:hover,
+.secondary:focus {
+  background: #111827;
+  outline: none;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.ghost:hover,
+.ghost:focus {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.preview-shell {
+  min-width: 0;
+  width: 100%;
+}
+
+.preview {
+  max-width: none;
+  width: 100%;
+  min-height: 720px;
+  margin: 0 auto;
+  padding: 48px 64px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: #111827;
+  overflow-x: auto;
+  font-family: var(--preview-font);
+  font-size: var(--preview-size);
+  line-height: var(--preview-line-height);
+}
+
+.preview:empty {
+  min-height: 360px;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.preview h1,
+.preview h2,
+.preview h3 {
+  color: #111827;
+  line-height: 1.2;
+}
+
+.preview h1 {
+  margin: 0 0 22px;
+  font-size: 2em;
+}
+
+.preview h2 {
+  border-bottom: 1px solid #e5e7eb;
+  margin-top: 32px;
+  padding-bottom: 6px;
+}
+
+.preview h3 {
+  margin-top: 24px;
+}
+
+.toc {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  margin: 0 0 30px;
+  padding: 18px 20px;
+}
+
+.toc h2 {
+  border: 0;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.toc ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.toc li {
+  margin: 4px 0;
+}
+
+.toc a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.toc a:hover {
+  text-decoration: underline;
+}
+
+.preview img,
+.preview svg {
+  max-width: 100%;
+}
+
+.preview pre {
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #f6f8fa;
+  padding: 14px;
+}
+
+.preview code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+}
+
+.preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+.preview th,
+.preview td {
+  border: 1px solid #d0d7de;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.preview blockquote {
+  border-left: 4px solid #d0d7de;
+  color: #475467;
+  margin-left: 0;
+  padding-left: 16px;
+}
+
+.mermaid-container {
+  margin: 24px 0;
+  overflow: auto;
+}
+
+.mermaid-container .mermaid {
+  max-width: 100%;
+}
+
+.mermaid svg {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  width: 100%;
+}
+
+.mermaid-container.is-landscape svg {
+  min-width: min(720px, 100%);
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    padding: 20px;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .control-panel {
+    position: static;
+  }
+
+  .preview {
+    padding: 28px;
+    min-height: 640px;
+  }
+}
+
+@media print {
+  @page {
+    margin: 0.6in;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .app-header,
+  .control-panel {
+    display: none;
+  }
+
+  .app-shell {
+    max-width: none;
+    padding: 0;
+  }
+
+  .workspace {
+    display: block;
+  }
+
+  .preview {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .placeholder {
+    display: none;
+  }
+
+  .preview a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .mermaid-container {
+    break-inside: avoid;
+    break-inside: avoid-page;
+    margin: 0.25in 0;
+    overflow: visible;
+    page-break-inside: avoid;
+  }
+
+  .mermaid-container .mermaid {
+    display: block;
+    width: 100%;
+  }
+
+  .mermaid-container svg {
+    display: block;
+    height: auto;
+    margin: 0 auto;
+    max-height: 7.25in !important;
+    max-width: 100% !important;
+    min-width: 0;
+    width: auto;
+  }
+}
+</style>
+</head>
+
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <h1>Markdown Booklet</h1>
+    </header>
+
+    <div class="workspace">
+      <section class="control-panel" aria-label="Document controls">
+        <div class="panel">
+          <div class="field">
+            <label for="docTitle">Document title</label>
+            <input id="docTitle" type="text" placeholder="Optional title">
+          </div>
+
+          <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Choose or drop markdown files">
+            <input id="fileInput" type="file" accept=".md,.markdown,text/markdown,text/plain" multiple hidden>
+            <div>
+              <div class="drop-title">Drop markdown files here</div>
+              <div class="drop-meta">or click to choose .md files</div>
+            </div>
+          </div>
+
+          <div class="file-toolbar">
+            <span id="fileStatus">0 files selected</span>
+            <button id="clearFiles" class="ghost" type="button" disabled>Clear</button>
+          </div>
+
+          <ul id="fileList" class="file-list" aria-label="Selected markdown files"></ul>
+        </div>
+
+        <div class="panel">
+          <h2>Rendering</h2>
+
+          <div class="field">
+            <label for="fontFamily">Font</label>
+            <select id="fontFamily">
+              <option value='Georgia, "Times New Roman", serif'>Serif</option>
+              <option value='Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'>Sans</option>
+              <option value='"SFMono-Regular", Consolas, "Liberation Mono", monospace'>Mono</option>
+              <option value='Arial, Helvetica, sans-serif'>Arial</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <div class="field-row">
+              <label for="fontSize">Font size</label>
+              <span id="fontSizeValue" class="value-label">16px</span>
+            </div>
+            <input id="fontSize" type="range" min="10" max="20" value="16">
+          </div>
+
+          <div class="field">
+            <div class="field-row">
+              <label for="lineHeight">Line spacing</label>
+              <span id="lineHeightValue" class="value-label">1.60</span>
+            </div>
+            <input id="lineHeight" type="range" min="1.0" max="2.0" step="0.05" value="1.6">
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button id="generateBtn" class="primary" type="button">Generate Preview</button>
+          <button id="printBtn" class="secondary" type="button" disabled>Print / Save PDF</button>
+        </div>
+      </section>
+
+      <section class="preview-shell" aria-label="Preview">
+        <div class="preview" id="output">
+          <div class="placeholder">Preview appears here after generating.</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  const md = window.markdownit({ html: true });
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: "base",
+    themeVariables: {
+      background: "#ffffff",
+      primaryColor: "#dbeafe",
+      primaryTextColor: "#111827",
+      primaryBorderColor: "#2563eb",
+      secondaryColor: "#dcfce7",
+      tertiaryColor: "#fef3c7",
+      mainBkg: "#dbeafe",
+      secondBkg: "#dcfce7",
+      nodeBorder: "#2563eb",
+      lineColor: "#475467",
+      clusterBkg: "#f8fafc",
+      clusterBorder: "#98a2b3",
+      edgeLabelBackground: "#ffffff",
+      fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    }
+  });
+
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("fileInput");
+  const fileList = document.getElementById("fileList");
+  const fileStatus = document.getElementById("fileStatus");
+  const clearFiles = document.getElementById("clearFiles");
+  const generateBtn = document.getElementById("generateBtn");
+  const printBtn = document.getElementById("printBtn");
+  const output = document.getElementById("output");
+  const fontFamily = document.getElementById("fontFamily");
+  const fontSize = document.getElementById("fontSize");
+  const fontSizeValue = document.getElementById("fontSizeValue");
+  const lineHeight = document.getElementById("lineHeight");
+  const lineHeightValue = document.getElementById("lineHeightValue");
+
+  let files = [];
+  let sortable = null;
+
+  dropzone.addEventListener("click", () => fileInput.click());
+
+  dropzone.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      fileInput.click();
+    }
+  });
+
+  dropzone.addEventListener("dragenter", (event) => {
+    event.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dragover");
+  });
+
+  dropzone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropzone.classList.remove("dragover");
+    addFiles(event.dataTransfer.files);
+  });
+
+  fileInput.addEventListener("change", () => {
+    addFiles(fileInput.files);
+    fileInput.value = "";
+  });
+
+  clearFiles.addEventListener("click", () => {
+    files = [];
+    renderList();
+  });
+
+  generateBtn.addEventListener("click", generate);
+  printBtn.addEventListener("click", printDocument);
+  window.addEventListener("beforeprint", preparePrintLayout);
+  window.addEventListener("afterprint", resetPrintLayout);
+
+  [fontFamily, fontSize, lineHeight].forEach((control) => {
+    control.addEventListener("input", applyRenderSettings);
+  });
+
+  function addFiles(fileList) {
+    const incoming = Array.from(fileList).filter((file) => /\.(md|markdown)$/i.test(file.name));
+    const seen = new Set(files.map(fileKey));
+
+    incoming.forEach((file) => {
+      const key = fileKey(file);
+      if (!seen.has(key)) {
+        files.push(file);
+        seen.add(key);
+      }
+    });
+
+    renderList();
+  }
+
+  function fileKey(file) {
+    return `${file.name}:${file.size}:${file.lastModified}`;
+  }
+
+  function renderList() {
+    if (sortable) {
+      sortable.destroy();
+      sortable = null;
+    }
+
+    fileList.innerHTML = "";
+    fileStatus.textContent = `${files.length} ${files.length === 1 ? "file" : "files"} selected`;
+    clearFiles.disabled = files.length === 0;
+    generateBtn.disabled = files.length === 0;
+
+    if (files.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "empty-state";
+      empty.textContent = "No files selected yet.";
+      fileList.appendChild(empty);
+      return;
+    }
+
+    files.forEach((file, index) => {
+      const item = document.createElement("li");
+      item.className = "file-item";
+
+      const order = document.createElement("span");
+      order.className = "order-badge";
+      order.textContent = String(index + 1).padStart(2, "0");
+
+      const handle = document.createElement("span");
+      handle.className = "drag-handle";
+      handle.setAttribute("aria-label", `Move ${file.name}`);
+      handle.textContent = "::";
+
+      const details = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "file-name";
+      name.textContent = file.name;
+
+      const meta = document.createElement("div");
+      meta.className = "file-meta";
+      meta.textContent = formatBytes(file.size);
+
+      const remove = document.createElement("button");
+      remove.className = "remove-file";
+      remove.type = "button";
+      remove.setAttribute("aria-label", `Remove ${file.name}`);
+      remove.textContent = "×";
+      remove.addEventListener("click", () => {
+        files.splice(index, 1);
+        renderList();
+      });
+
+      details.append(name, meta);
+      item.append(order, handle, details, remove);
+      fileList.appendChild(item);
+    });
+
+    sortable = new Sortable(fileList, {
+      animation: 150,
+      ghostClass: "file-item-ghost",
+      handle: ".drag-handle",
+      onEnd: (event) => {
+        if (event.oldIndex === event.newIndex) return;
+
+        const moved = files.splice(event.oldIndex, 1)[0];
+        files.splice(event.newIndex, 0, moved);
+        renderList();
+      }
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function generate() {
+    if (files.length === 0) {
+      output.innerHTML = '<div class="placeholder">Add markdown files to generate a preview.</div>';
+      printBtn.disabled = true;
+      return;
+    }
+
+    generateBtn.disabled = true;
+    generateBtn.textContent = "Generating...";
+
+    try {
+      let combined = "";
+
+      for (const file of files) {
+        const text = await file.text();
+        combined += (combined ? "\n\n" : "") + text;
+      }
+
+      await renderMarkdown(combined);
+      printBtn.disabled = false;
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.textContent = "Generate Preview";
+    }
+  }
+
+  function printDocument() {
+    preparePrintLayout();
+    window.print();
+  }
+
+  async function renderMarkdown(text) {
+    output.innerHTML = md.render(text);
+
+    applyTitle();
+    generateTOC();
+    await renderMermaid();
+    applyRenderSettings();
+  }
+
+  function filenameToTitle(filename) {
+    return filename
+      .replace(/\.(md|markdown)$/i, "")
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function applyTitle() {
+    const titleInput = document.getElementById("docTitle").value.trim();
+    let title = titleInput;
+
+    if (!title && files.length > 0) {
+      title = filenameToTitle(files[0].name);
+    }
+
+    if (!title) return;
+
+    const titleEl = document.createElement("h1");
+    titleEl.textContent = title;
+    output.prepend(titleEl);
+  }
+
+  function generateTOC() {
+    const headings = output.querySelectorAll("h1, h2, h3");
+    if (headings.length === 0) return;
+
+    const toc = document.createElement("nav");
+    toc.className = "toc";
+    toc.setAttribute("aria-label", "Table of contents");
+
+    const tocHeading = document.createElement("h2");
+    tocHeading.textContent = "Table of Contents";
+
+    const list = document.createElement("ul");
+
+    headings.forEach((heading, index) => {
+      const id = `heading-${index}`;
+      heading.id = id;
+
+      const item = document.createElement("li");
+      item.style.marginLeft = `${(parseInt(heading.tagName[1], 10) - 1) * 10}px`;
+
+      const link = document.createElement("a");
+      link.href = `#${id}`;
+      link.textContent = heading.textContent;
+
+      item.appendChild(link);
+      list.appendChild(item);
+    });
+
+    toc.append(tocHeading, list);
+
+    const title = output.querySelector("h1");
+    if (title) {
+      title.insertAdjacentElement("afterend", toc);
+    } else {
+      output.prepend(toc);
+    }
+  }
+
+  async function renderMermaid() {
+    const blocks = output.querySelectorAll("code.language-mermaid");
+
+    blocks.forEach((block) => {
+      const parent = block.parentElement;
+      const wrapper = document.createElement("div");
+      wrapper.className = "mermaid-container";
+
+      const mermaidDiv = document.createElement("div");
+      mermaidDiv.className = "mermaid";
+      mermaidDiv.textContent = block.textContent;
+
+      wrapper.appendChild(mermaidDiv);
+      parent.replaceWith(wrapper);
+    });
+
+    const diagrams = Array.from(output.querySelectorAll(".mermaid"));
+    if (diagrams.length === 0) return;
+
+    if (mermaid.run) {
+      await mermaid.run({ nodes: diagrams });
+    } else {
+      mermaid.init(undefined, diagrams);
+    }
+
+    normalizeMermaidDiagrams();
+  }
+
+  function normalizeMermaidDiagrams() {
+    output.querySelectorAll(".mermaid-container").forEach((element) => {
+      const svg = element.querySelector("svg");
+      if (!svg) return;
+
+      const dimensions = getSvgDimensions(svg);
+      if (!svg.getAttribute("viewBox") && dimensions.width && dimensions.height) {
+        svg.setAttribute("viewBox", `0 0 ${dimensions.width} ${dimensions.height}`);
+      }
+
+      svg.removeAttribute("width");
+      svg.removeAttribute("height");
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+      element.classList.toggle("is-landscape", dimensions.width > dimensions.height);
+      element.classList.toggle("is-portrait", dimensions.width <= dimensions.height);
+    });
+  }
+
+  function preparePrintLayout() {
+    document.body.classList.add("is-printing");
+    fitMermaidDiagramsForPrint();
+  }
+
+  function resetPrintLayout() {
+    document.body.classList.remove("is-printing");
+
+    output.querySelectorAll(".mermaid-container svg").forEach((svg) => {
+      svg.style.removeProperty("width");
+      svg.style.removeProperty("height");
+    });
+  }
+
+  function fitMermaidDiagramsForPrint() {
+    const maxWidth = 7.25 * 96;
+    const maxHeight = 7.25 * 96;
+
+    output.querySelectorAll(".mermaid-container svg").forEach((svg) => {
+      const dimensions = getSvgDimensions(svg);
+      const scale = Math.min(maxWidth / dimensions.width, maxHeight / dimensions.height, 1);
+      const width = Math.max(1, Math.floor(dimensions.width * scale));
+      const height = Math.max(1, Math.floor(dimensions.height * scale));
+
+      svg.style.width = `${width}px`;
+      svg.style.height = `${height}px`;
+    });
+  }
+
+  function getSvgDimensions(svg) {
+    const viewBox = svg.viewBox && svg.viewBox.baseVal;
+
+    if (viewBox && viewBox.width && viewBox.height) {
+      return { width: viewBox.width, height: viewBox.height };
+    }
+
+    try {
+      const bbox = svg.getBBox();
+      if (bbox.width && bbox.height) {
+        return { width: bbox.width, height: bbox.height };
+      }
+    } catch (error) {
+      // Fall through to attribute/client measurements.
+    }
+
+    return {
+      width: parseFloat(svg.getAttribute("width")) || svg.clientWidth || 1,
+      height: parseFloat(svg.getAttribute("height")) || svg.clientHeight || 1
+    };
+  }
+
+  function applyRenderSettings() {
+    output.style.setProperty("--preview-font", fontFamily.value);
+    output.style.setProperty("--preview-size", `${fontSize.value}px`);
+    output.style.setProperty("--preview-line-height", lineHeight.value);
+    fontSizeValue.textContent = `${fontSize.value}px`;
+    lineHeightValue.textContent = Number(lineHeight.value).toFixed(2);
+  }
+
+  applyRenderSettings();
+  renderList();
+  </script>
+</body>
+</html>
