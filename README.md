@@ -1,6 +1,6 @@
 # Markdown Booklet
 
-Combine multiple markdown files, reorder them, and render a single print-ready document or PDF — entirely in your browser. Nothing is uploaded anywhere.
+Combine multiple markdown files, reorder them, and render a single print-ready document or PDF, entirely in your browser. Nothing is uploaded anywhere.
 
 ![Screenshot](screenshot.png)
 
@@ -24,7 +24,7 @@ git clone https://github.com/colincarrihill/markdown-booklet
 open index.html
 ```
 
-No install, no server, no build step. Just open the file.
+Super easy - no install, server, or build step. Just open the file.
 
 ## Stack
 
